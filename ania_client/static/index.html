@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Convertitore ANIA</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --fg:#1d2430; --mut:#6b7686; --acc:#1f6feb; --bd:#dde1e7; --ok:#2a9d4b; --warn:#c98a00; --err:#d33; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14181f; --card:#1c222b; --fg:#e6e9ee; --mut:#8f9aab; --acc:#4c8dff; --bd:#2e3745; --ok:#4cc16b; --warn:#e8a317; --err:#ff6b6b; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; font:15px system-ui,sans-serif; background:var(--bg); color:var(--fg) }
+  header { padding:14px 24px; border-bottom:1px solid var(--bd); background:var(--card); display:flex; gap:12px; align-items:center }
+  header h1 { font-size:18px; margin:0; flex:1 }
+  header .ver { color:var(--mut); font-size:12px }
+  main { max-width:1000px; margin:20px auto; padding:0 16px; display:grid; gap:16px }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:16px }
+  .card h2 { margin:0 0 12px; font-size:15px }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px }
+  @media (max-width:760px) { .cols { grid-template-columns:1fr } }
+  #drop { border:2px dashed var(--bd); border-radius:10px; padding:30px; text-align:center; color:var(--mut); cursor:pointer }
+  #drop.over { border-color:var(--acc); color:var(--acc) }
+  label { display:block; font-size:12px; color:var(--mut); margin:12px 0 4px }
+  input[type=text], input[type=password], select { width:100%; padding:8px; border:1px solid var(--bd); border-radius:6px; background:var(--bg); color:var(--fg) }
+  button { padding:8px 14px; border:0; border-radius:6px; background:var(--acc); color:#fff; font-weight:600; cursor:pointer }
+  button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc) }
+  button:disabled { opacity:.5; cursor:default }
+  .banner { padding:10px 14px; border-radius:8px; font-size:14px; border:1px solid var(--bd); background:var(--card) }
+  .banner.warn { border-color:var(--warn) } .banner.err { border-color:var(--err) } .banner.ok { border-color:var(--ok) }
+  .ok { color:var(--ok) } .warn { color:var(--warn) } .err { color:var(--err) } .mut { color:var(--mut) }
+  .b { font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; color:#fff; white-space:nowrap }
+  .b.ok { background:var(--ok); color:#fff } .b.attenzione { background:#e8a317; color:#000 } .b.errore { background:var(--err); color:#fff } .b.attesa { background:var(--mut) }
+  table { width:100%; border-collapse:collapse; font-size:13px }
+  td,th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--bd); vertical-align:top }
+  .files { font:12px ui-monospace,Consolas,monospace; word-break:break-all; color:var(--mut) }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
+  a { color:var(--acc) }
+</style>
+</head>
+<body>
+<header>
+  <h1>Convertitore ANIA</h1>
+  <span class="ver" id="ver"></span>
+  <button class="sec" id="esci" title="Chiude il programma">Esci</button>
+</header>
+<main>
+  <div id="avvisi"></div>
+
+  <section class="card">
+    <h2>1. Carica i preventivi (PDF)</h2>
+    <div id="drop">Trascina qui uno o più PDF, oppure clicca per sceglierli</div>
+    <input id="file" type="file" accept=".pdf,application/pdf" multiple hidden>
+    <label>N. autorizzazione ai lavori (facoltativo, vale per tutti i file di questa volta)</label>
+    <input id="aut" type="text" placeholder="es. NEM24611831">
+    <div class="row" style="margin-top:14px">
+      <button id="go" disabled>Converti</button>
+      <span id="stato" class="mut"></span>
+    </div>
+    <table id="coda" style="margin-top:12px"></table>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>2. Dove salvare</h2>
+      <label>Formato del file convertito</label><select id="formato"></select>
+      <label>Cartella di salvataggio (da cui importare in WinCar)</label><input id="cartella" type="text">
+      <div class="row" style="margin-top:14px">
+        <button id="salva-dest" class="sec">Salva</button>
+        <button id="apri" class="sec">Apri la cartella</button>
+        <span id="msg-dest" class="mut"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Licenza e server</h2>
+      <label>Chiave di licenza</label><input id="chiave" type="password" autocomplete="off" placeholder="ANIA-XXXX-XXXX-XXXX-XXXX">
+      <label>Indirizzo del server</label><input id="url" type="text">
+      <div class="row" style="margin-top:14px">
+        <button id="salva-lic">Salva e verifica</button>
+        <span id="msg-lic" class="mut"></span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Registro delle conversioni</h2>
+    <div class="row" style="font-size:13px">
+      <label style="margin:0;display:flex;gap:6px;align-items:center"><input type="checkbox" id="soloprob"> solo problemi (attenzione ed errori)</label>
+      <button id="reg-refresh" class="sec">Aggiorna</button>
+      <a href="/api/registro.csv">Scarica CSV</a>
+    </div>
+    <div style="overflow-x:auto;margin-top:10px"><table id="reg"></table></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let coda = [], inCorso = false, bloccato = false;
+
+async function api(url, opt) {
+  const r = await fetch(url, opt);
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw Object.assign(new Error((d && (d.detail || (d.errori && Object.values(d.errori).join(' ')))) || ('Errore ' + r.status)), { dati: d });
+  return d;
+}
+
+function banner(classe, html) { return `<div class="banner ${classe}">${html}</div>`; }
+
+async function caricaStato() {
+  const s = await api('/api/stato');
+  $('ver').textContent = 'versione ' + s.versione;
+  $('formato').innerHTML = Object.entries(s.formati).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  $('formato').value = s.impostazioni.formato;
+  $('cartella').value = s.impostazioni.cartella;
+  $('url').value = s.impostazioni.url;
+  $('chiave').placeholder = s.impostazioni.ha_chiave ? s.impostazioni.chiave + '  (già salvata)' : 'ANIA-XXXX-XXXX-XXXX-XXXX';
+  return s;
+}
+
+async function controlli() {
+  const av = [];
+  const s = await api('/api/stato');
+  if (!s.configurata) av.push(banner('warn', 'Inserisci la <b>chiave di licenza</b> nel riquadro 3 per poter convertire.'));
+  $('avvisi').innerHTML = av.join('');
+  try {
+    const v = await api('/api/server');
+    bloccato = v.obbligatorio;
+    if (!v.raggiungibile) av.push(banner('err', 'Server non raggiungibile: ' + esc(v.errore || '') + '. Controlla la connessione a internet.'));
+    else if (v.obbligatorio) av.push(banner('err', `<b>Aggiornamento obbligatorio:</b> serve la versione ${esc(v.client_minimo)} o successiva. Scarica la nuova versione.`));
+    else if (v.licenza && v.licenza.valida === false) av.push(banner('err', 'Licenza: ' + esc(v.licenza.errore)));
+    else if (v.licenza && v.licenza.valida) av.push(banner('ok', `Licenza valida: <b>${esc(v.licenza.cliente)}</b>${v.licenza.postazione ? ' (' + esc(v.licenza.postazione) + ')' : ''}${v.licenza.scadenza ? ', scade il ' + esc(v.licenza.scadenza) : ''}`));
+  } catch (e) { av.push(banner('err', esc(e.message))); }
+  try {
+    const a = await api('/api/aggiornamenti');
+    if (a.disponibile) av.push(banner('warn', `Disponibile la versione <b>${esc(a.versione)}</b>. <a href="${esc(a.url)}" target="_blank" rel="noopener">Scarica l'aggiornamento</a>`));
+  } catch (e) {}
+  $('avvisi').innerHTML = av.join('');
+  aggiornaPulsante();
+}
+
+function aggiornaPulsante() { $('go').disabled = inCorso || bloccato || !coda.some(c => c.stato === 'attesa'); }
+
+function disegnaCoda() {
+  $('coda').innerHTML = coda.map(c => `<tr><td><span class="b ${c.stato}">${esc(c.etichetta)}</span></td><td>${esc(c.file.name)}
+    ${(c.errori || []).map(m => `<div class="err">${esc(m)}</div>`).join('')}${(c.avvisi || []).map(m => `<div class="warn">${esc(m)}</div>`).join('')}
+    ${(c.files || []).length ? `<div class="files">${c.files.map(esc).join('<br>')}</div>` : ''}</td></tr>`).join('');
+}
+
+function aggiungi(fileList) {
+  for (const f of fileList) {
+    if (!f.name.toLowerCase().endsWith('.pdf')) continue;
+    coda.push({ file: f, stato: 'attesa', etichetta: 'IN ATTESA' });
+  }
+  disegnaCoda(); aggiornaPulsante();
+}
+
+$('drop').onclick = () => $('file').click();
+$('file').onchange = e => { aggiungi(e.target.files); e.target.value = ''; };
+$('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('over'); };
+$('drop').ondragleave = () => $('drop').classList.remove('over');
+$('drop').ondrop = e => { e.preventDefault(); $('drop').classList.remove('over'); aggiungi(e.dataTransfer.files); };
+
+$('go').onclick = async () => {
+  inCorso = true; aggiornaPulsante();
+  const attese = coda.filter(c => c.stato === 'attesa');
+  let n = 0;
+  for (const c of attese) {
+    n++; $('stato').textContent = `Elaborazione ${n} di ${attese.length}…`;
+    c.stato = 'attesa'; c.etichetta = 'IN CORSO'; disegnaCoda();
+    const fd = new FormData(); fd.append('file', c.file); fd.append('autorizzazione', $('aut').value);
+    try {
+      const r = await api('/api/converti', { method: 'POST', body: fd });
+      Object.assign(c, r, { stato: r.esito, etichetta: r.esito.toUpperCase() });
+    } catch (e) { Object.assign(c, { stato: 'errore', etichetta: 'ERRORE', errori: [e.message] }); }
+    disegnaCoda();
+  }
+  inCorso = false; $('stato').textContent = 'Finito.'; aggiornaPulsante(); caricaRegistro();
+};
+
+$('salva-dest').onclick = async () => {
+  try { await api('/api/impostazioni', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formato: $('formato').value, cartella: $('cartella').value }) });
+    $('msg-dest').innerHTML = '<span class="ok">Salvato.</span>';
+  } catch (e) { $('msg-dest').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+};
+$('apri').onclick = () => api('/api/apri-cartella', { method: 'POST' }).catch(e => $('msg-dest').innerHTML = `<span class="err">${esc(e.message)}</span>`);
+
+$('salva-lic').onclick = async () => {
+  $('msg-lic').textContent = 'Verifica in corso…';
+  try {
+    await api('/api/impostazioni', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chiave: $('chiave').value, url: $('url').value }) });
+    $('chiave').value = ''; $('msg-lic').textContent = '';
+    await caricaStato(); await controlli();
+  } catch (e) { $('msg-lic').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+};
+
+async function caricaRegistro() {
+  const v = await api('/api/registro?limite=200&solo_problemi=' + $('soloprob').checked);
+  $('reg').innerHTML = v.length
+    ? '<tr><th>Quando</th><th>File</th><th>Tipo</th><th>Esito</th><th>Dettagli</th></tr>' + v.map(x =>
+        `<tr><td style="white-space:nowrap">${esc(x.quando.replace('T', ' '))}</td><td>${esc(x.file)}</td><td>${esc(x.tipo || '–')}</td>
+        <td><span class="b ${x.esito}">${x.esito.toUpperCase()}</span></td>
+        <td>${x.errori.map(m => `<div class="err">${esc(m)}</div>`).join('')}${x.avvisi.map(m => `<div class="warn">${esc(m)}</div>`).join('')}
+        ${x.files.length ? `<div class="files">${x.files.map(esc).join('<br>')}</div>` : ''}</td></tr>`).join('')
+    : '<tr><td class="mut">Nessuna conversione registrata.</td></tr>';
+}
+$('soloprob').onchange = caricaRegistro; $('reg-refresh').onclick = caricaRegistro;
+
+$('esci').onclick = async () => {
+  if (!confirm('Chiudere il programma?')) return;
+  try { await api('/api/esci', { method: 'POST' }); } catch (e) {}
+  document.body.innerHTML = '<p style="padding:40px;font:16px system-ui">Programma chiuso. Puoi chiudere questa scheda.</p>';
+};
+
+caricaStato().then(controlli).then(caricaRegistro).catch(e => $('avvisi').innerHTML = banner('err', esc(e.message)));
+</script>
+</body>
+</html>
