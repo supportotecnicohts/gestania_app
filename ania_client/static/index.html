@@ -134,11 +134,25 @@ async function controlli() {
   } catch (e) { av.push(banner('err', esc(e.message))); }
   try {
     const a = await api('/api/aggiornamenti');
-    if (a.disponibile) av.push(banner('warn', `Disponibile la versione <b>${esc(a.versione)}</b>. <a href="${esc(a.url)}" target="_blank" rel="noopener">Scarica l'aggiornamento</a>`));
+    if (a.disponibile && a.automatico) av.push(banner('warn', `<span id="agg-testo">Disponibile la versione <b>${esc(a.versione)}</b>.</span> <button id="agg" type="button">Aggiorna ora</button>`));
+    else if (a.disponibile) av.push(banner('warn', `Disponibile la versione <b>${esc(a.versione)}</b>. <a href="${esc(a.url)}" target="_blank" rel="noopener">Scarica l'aggiornamento</a>`));
   } catch (e) {}
   $('avvisi').innerHTML = av.join('');
   aggiornaPulsante();
 }
+
+async function aggiornaOra() {
+  const b = $('agg'), t = $('agg-testo');
+  b.disabled = true; t.textContent = 'Scarico l\'aggiornamento…';
+  try {
+    await api('/api/aggiorna', { method: 'POST' });
+    $('avvisi').innerHTML = banner('ok', '<b>Aggiornamento in corso.</b> Il programma si chiude e si riapre da solo tra pochi secondi: puoi chiudere questa scheda.');
+    bloccato = true; aggiornaPulsante();
+  } catch (e) {
+    t.textContent = 'Aggiornamento non riuscito: ' + e.message; b.disabled = false; b.textContent = 'Riprova';
+  }
+}
+$('avvisi').addEventListener('click', e => { if (e.target.id === 'agg') aggiornaOra(); });
 
 function aggiornaPulsante() { $('go').disabled = inCorso || bloccato || !coda.some(c => c.stato === 'attesa'); }
 

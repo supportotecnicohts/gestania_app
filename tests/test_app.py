@@ -143,3 +143,118 @@ def test_server_vecchio_senza_verifica_licenza(client, server, tmp_path):
     server.risposte["/v1/licenza"] = Risposta(404, {"detail": "Not Found"})
     v = client.get("/api/server").json()
     assert v["raggiungibile"] and v["licenza"] is None
+
+
+# --- aggiornamento con un clic -------------------------------------------------------------------------------------
+
+import hashlib
+
+from ania_client import aggiorna
+
+INSTALLER = b"MZ-installer-finto" * 1000
+URL_RELEASE = "https://github.com/x/gestania_app/releases/download/v9.9.9/ConvertitoreANIA-Setup-9.9.9.exe"
+
+
+def release(sha=None, url=URL_RELEASE):
+    return {"versione": "9.9.9", "sha256": sha or hashlib.sha256(INSTALLER).hexdigest(), "url": url}
+
+
+def stato_con_release(server, rel):
+    server.risposte["/v1/stato"] = Risposta(200, {"stato": "ok", "versione_api": "1", "client_minimo": "0.0.0",
+                                                  "client_ultima": rel})
+
+
+class Scaricamento:
+    """requests.get finto in streaming: opzionalmente passa da un reindirizzamento."""
+    def __init__(self, contenuto, url=URL_RELEASE, history=()):
+        self.contenuto, self.url, self.history = contenuto, url, list(history)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        pass
+
+    def iter_content(self, n):
+        for i in range(0, len(self.contenuto), n):
+            yield self.contenuto[i:i + n]
+
+
+def test_aggiornamento_proposto_dal_server(client, server, tmp_path, monkeypatch):
+    configura(client, tmp_path)
+    monkeypatch.setattr(aggiorna, "puo_installare", lambda: True)
+    stato_con_release(server, release())
+    a = client.get("/api/aggiornamenti").json()
+    assert a["disponibile"] and a["versione"] == "9.9.9" and a["automatico"] is True
+
+
+def test_nessun_aggiornamento_se_la_versione_e_gia_questa(client, server, tmp_path):
+    configura(client, tmp_path)
+    stato_con_release(server, {**release(), "versione": "0.1.0"})
+    assert client.get("/api/aggiornamenti").json()["disponibile"] is False
+
+
+def test_release_del_server_non_valida_viene_ignorata(client, server, tmp_path):
+    configura(client, tmp_path)
+    for rel in (release(url="https://sito-strano.example/a.exe"), release(sha="1234"), {"versione": "9.9.9"}):
+        appmod._server.update(quando=0.0, dati=None)
+        stato_con_release(server, rel)
+        assert client.get("/api/server").json()["client_ultima"] is None
+
+
+def test_aggiorna_scarica_verifica_e_lancia(client, server, tmp_path, monkeypatch):
+    configura(client, tmp_path)
+    lanciati, chiusure = [], []
+    monkeypatch.setattr(aggiorna, "puo_installare", lambda: True)
+    monkeypatch.setattr(aggiorna.requests, "get", lambda *a, **k: Scaricamento(INSTALLER))
+    monkeypatch.setattr(aggiorna, "lancia", lanciati.append)
+    monkeypatch.setattr(appmod.threading, "Timer", lambda t, f: type("T", (), {"start": lambda s: chiusure.append(f)})())
+    appmod.app.state.chiudi = lambda: None
+    stato_con_release(server, release())
+    r = client.post("/api/aggiorna")
+    assert r.status_code == 200 and r.json()["versione"] == "9.9.9"
+    assert len(lanciati) == 1 and lanciati[0].read_bytes() == INSTALLER and len(chiusure) == 1
+    appmod._aggiornamento_in_corso.release()
+
+
+def test_aggiorna_rifiuta_file_con_impronta_diversa(client, server, tmp_path, monkeypatch):
+    configura(client, tmp_path)
+    lanciati = []
+    monkeypatch.setattr(aggiorna, "puo_installare", lambda: True)
+    monkeypatch.setattr(aggiorna.requests, "get", lambda *a, **k: Scaricamento(b"file manomesso"))
+    monkeypatch.setattr(aggiorna, "lancia", lanciati.append)
+    stato_con_release(server, release())
+    r = client.post("/api/aggiorna")
+    assert r.status_code == 502 and "non corrisponde" in r.json()["detail"]
+    assert not lanciati and not list((tmp_path / "dati" / "aggiornamenti").glob("*"))  # nulla resta su disco
+    assert appmod._aggiornamento_in_corso.acquire(blocking=False)  # il blocco e' stato rilasciato
+    appmod._aggiornamento_in_corso.release()
+
+
+def test_aggiorna_rifiuta_reindirizzamento_fuori_da_github(client, server, tmp_path, monkeypatch):
+    configura(client, tmp_path)
+    lanciati = []
+    cattivo = Scaricamento(INSTALLER, url="https://sito-strano.example/a.exe", history=[Scaricamento(b"", URL_RELEASE)])
+    monkeypatch.setattr(aggiorna, "puo_installare", lambda: True)
+    monkeypatch.setattr(aggiorna.requests, "get", lambda *a, **k: cattivo)
+    monkeypatch.setattr(aggiorna, "lancia", lanciati.append)
+    stato_con_release(server, release())
+    assert client.post("/api/aggiorna").status_code == 502 and not lanciati
+
+
+def test_aggiorna_non_parte_con_conversione_in_corso_o_senza_exe(client, server, tmp_path, monkeypatch):
+    configura(client, tmp_path)
+    stato_con_release(server, release())
+    assert client.post("/api/aggiorna").status_code == 400  # eseguito da sorgente, non installato
+    monkeypatch.setattr(aggiorna, "puo_installare", lambda: True)
+    appmod._conversioni_in_corso["n"] = 1
+    try:
+        assert client.post("/api/aggiorna").status_code == 409
+    finally:
+        appmod._conversioni_in_corso["n"] = 0
+    stato_con_release(server, None)
+    appmod._server.update(quando=0.0, dati=None)
+    assert client.post("/api/aggiorna").status_code == 404

@@ -41,3 +41,5 @@ Name: "{autodesktop}\Convertitore ANIA"; Filename: "{app}\ConvertitoreANIA.exe";
 
 [Run]
 Filename: "{app}\ConvertitoreANIA.exe"; Description: "Avvia Convertitore ANIA"; Flags: nowait postinstall skipifsilent
+; aggiornamento automatico (installer lanciato dal programma con /VERYSILENT): lo riapre da solo
+Filename: "{app}\ConvertitoreANIA.exe"; Flags: nowait; Check: WizardSilent

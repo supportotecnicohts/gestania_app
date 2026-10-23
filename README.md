@@ -43,35 +43,48 @@ di Windows. I PDF **non** vengono copiati da nessuna parte dal programma.
 
 - **Versione minima obbligatoria**: il server può dichiarare (variabile `CLIENT_MINIMO`) la versione minima accettata;
   un client più vecchio mostra "Aggiornamento obbligatorio" e non converte finché non si aggiorna.
-- **Nuove versioni**: all'apertura il programma controlla le *release* del repository GitHub pubblico
-  (`ania_client/config.py`, `REPO_GITHUB`, oppure la variabile `ANIA_REPO_GITHUB`) e mostra un avviso con il link per
-  scaricare l'installer. L'installer nuovo si lancia sopra il vecchio: impostazioni e registro restano.
+- **Aggiornamento con un clic**: il server (`api.gestania.it`) dichiara l'ultima versione, l'indirizzo dell'installer su
+  GitHub e la sua impronta SHA-256 (`data\client_release.json` sul server). Se è più nuova di quella installata, il
+  programma mostra "Disponibile la versione X" con il pulsante **Aggiorna ora**: scarica l'installer, **controlla
+  l'impronta** (se non coincide non installa niente), lo lancia in silenzio, si chiude e si riapre aggiornato.
+  Impostazioni, chiave e registro restano. L'aggiornamento è rifiutato se c'è una conversione in corso.
+  GitHub fa solo da deposito del file: di cosa installare decide il server, quindi una release manomessa su GitHub non
+  viene installata. Sono accettati solo indirizzi `https://github.com/...` (e i suoi host di download).
+- **Server senza versione dichiarata** (o più vecchio): resta il vecchio avviso con il link alla release
+  (`REPO_GITHUB` / `ANIA_REPO_GITHUB`), senza installazione automatica.
 
 ## Per chi sviluppa
 
 ```
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt
-.venv\Scripts\python.exe -m pytest tests -q          # 24 test, server simulato
+.venv\Scripts\python.exe -m pytest tests -q          # 31 test, server simulato
 .venv\Scripts\python.exe run_client.py               # avvia il programma
 powershell -ExecutionPolicy Bypass -File build\costruisci.ps1     # dist\ConvertitoreANIA.exe
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DVersione=0.1.0 build\installer.iss    # dist\ConvertitoreANIA-Setup-0.1.0.exe
 ```
 
 Variabili utili: `ANIA_NO_BROWSER=1` (non apre il browser), `ANIA_CLIENT_DATA` (sposta la cartella dei dati),
-`ANIA_REPO_GITHUB` (repository per gli aggiornamenti).
+`ANIA_REPO_GITHUB` (repository per il solo avviso di nuova versione, quando il server non dichiara l'ultima).
 
 ### Pubblicare una nuova versione
 
 1. Aumentare `__version__` in `ania_client/__init__.py`.
-2. Costruire l'`.exe` e l'installer (vedi sopra).
-3. Su GitHub creare una **release** con tag `vX.Y.Z` e allegare `ConvertitoreANIA-Setup-X.Y.Z.exe`.
-4. I client la vedranno al prossimo avvio. Per **imporla**, impostare `CLIENT_MINIMO=X.Y.Z` sul server e riavviare
-   il servizio.
+2. `powershell -ExecutionPolicy Bypass -File build\pubblica.ps1` costruisce exe e installer e stampa l'**impronta SHA-256**
+   e i comandi dei passi seguenti.
+3. Su GitHub (repository pubblico `gestania_app`) creare una **release** con tag `vX.Y.Z` e allegare
+   `ConvertitoreANIA-Setup-X.Y.Z.exe`. Il nome del file deve essere esattamente quello.
+4. **Sul server**, con il progetto `docuware-idp-ania`:
+   `.venv\Scripts\python.exe scripts\pubblica_client.py X.Y.Z <sha256> --repo PROPRIETARIO/gestania_app`
+   Da questo momento i client propongono l'aggiornamento (entro pochi minuti, senza riavviare il servizio).
+   `scripts\pubblica_client.py mostra` / `ritira` per vedere o togliere la versione pubblicata.
+5. Per **imporla**, impostare anche `CLIENT_MINIMO=X.Y.Z` sul server e riavviare il servizio.
+
+Le versioni precedenti alla 0.2.0 non hanno il pulsante: vanno aggiornate una volta a mano con l'installer.
 
 ### Note sulla distribuzione
 
 - L'`.exe` non è firmato: Windows (SmartScreen) può mostrare "app non riconosciuta" al primo avvio, e alcuni antivirus
   segnalano a torto gli eseguibili creati con PyInstaller. Un certificato di firma del codice (a pagamento) risolve il
   primo problema; in caso di falsi positivi si può passare alla modalità `--onedir` o segnalare il file all'antivirus.
-- Prima di pubblicare, impostare in `ania_client/config.py` il valore di `REPO_GITHUB` ("proprietario/repository").
+- L'installer scaricato dal programma non porta il "marchio di provenienza dal web", quindi SmartScreen non lo blocca durante l'aggiornamento; resta l'avviso della prima installazione manuale.
