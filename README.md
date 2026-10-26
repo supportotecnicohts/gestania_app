@@ -74,8 +74,8 @@ Variabili utili: `ANIA_NO_BROWSER=1` (non apre il browser), `ANIA_CLIENT_DATA` (
    e i comandi dei passi seguenti.
 3. Su GitHub (repository pubblico `gestania_app`) creare una **release** con tag `vX.Y.Z` e allegare
    `ConvertitoreANIA-Setup-X.Y.Z.exe`. Il nome del file deve essere esattamente quello.
-4. **Sul server**, con il progetto `docuware-idp-ania`:
-   `.venv\Scripts\python.exe scripts\pubblica_client.py X.Y.Z <sha256> --repo PROPRIETARIO/gestania_app`
+4. **Sul server**, nella cartella del servizio in uso (`C:\GestAnia2`, oppure `C:\ServizioANIA` con il vecchio natif):
+   `.venv\Scripts\python.exe scripts\pubblica_client.py X.Y.Z <sha256> --repo supportotecnicohts/gestania_app`
    Da questo momento i client propongono l'aggiornamento (entro pochi minuti, senza riavviare il servizio).
    `scripts\pubblica_client.py mostra` / `ritira` per vedere o togliere la versione pubblicata.
 5. Per **imporla**, impostare anche `CLIENT_MINIMO=X.Y.Z` sul server e riavviare il servizio.

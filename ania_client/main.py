@@ -3,6 +3,7 @@ import os
 import socket
 import sys
 import threading
+import time
 import webbrowser
 
 import requests
@@ -14,9 +15,22 @@ from .config import cartella_dati
 PORTE = range(8765, 8776)
 
 
+def _porta_occupata(porta):
+    """True se qualcosa e' in ascolto su quella porta. Si prova a occuparla invece di collegarsi: su Windows
+    una connessione a una porta chiusa impiega circa 2 secondi a fallire, un `bind` risponde subito."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", porta))
+        except OSError:
+            return True
+    return False
+
+
 def _istanza_attiva():
-    """Porta su cui gira gia' il programma, se c'e'."""
+    """Porta su cui gira gia' il programma, se c'e'. Si interrogano solo le porte occupate."""
     for porta in PORTE:
+        if not _porta_occupata(porta):
+            continue
         try:
             r = requests.get(f"http://127.0.0.1:{porta}/api/stato", timeout=1)
             if r.ok and r.json().get("app") == "ConvertitoreANIA":
@@ -28,10 +42,19 @@ def _istanza_attiva():
 
 def _porta_libera():
     for porta in PORTE:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", porta)) != 0:
-                return porta
+        if not _porta_occupata(porta):
+            return porta
     raise RuntimeError("Nessuna porta libera tra 8765 e 8775")
+
+
+def _apri_browser_quando_pronto(server, porta, attesa=15):
+    """Apre la pagina appena il server accetta connessioni (non dopo un'attesa fissa)."""
+    def lavoro():
+        fine = time.time() + attesa
+        while not server.started and time.time() < fine:
+            time.sleep(0.05)
+        webbrowser.open(f"http://127.0.0.1:{porta}")
+    threading.Thread(target=lavoro, daemon=True).start()
 
 
 def main():
@@ -50,7 +73,7 @@ def main():
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=porta, log_config=None))
     app.state.chiudi = lambda: setattr(server, "should_exit", True)
     if not os.getenv("ANIA_NO_BROWSER"):
-        threading.Timer(1.2, webbrowser.open, args=(f"http://127.0.0.1:{porta}",)).start()
+        _apri_browser_quando_pronto(server, porta)
     server.run()
 
 

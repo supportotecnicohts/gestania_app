@@ -16,6 +16,6 @@ $sha = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
 
 === Versione $versione pronta ===
 1. GitHub: crea una release con tag v$versione e allega  $((Resolve-Path $installer).Path)
-2. Sul server, dopo aver caricato la release:
-   .venv\Scripts\python.exe scripts\pubblica_client.py $versione $sha --repo PROPRIETARIO/gestania_app
+2. Sul server (cartella C:\GestAnia2), dopo aver caricato la release:
+   .venv\Scripts\python.exe scripts\pubblica_client.py $versione $sha --repo supportotecnicohts/gestania_app
 "@
