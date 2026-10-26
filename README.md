@@ -60,7 +60,7 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt
 .venv\Scripts\python.exe -m pytest tests -q          # 31 test, server simulato
 .venv\Scripts\python.exe run_client.py               # avvia il programma
-powershell -ExecutionPolicy Bypass -File build\costruisci.ps1     # dist\ConvertitoreANIA.exe
+powershell -ExecutionPolicy Bypass -File build\costruisci.ps1     # dist\ConvertitoreANIA\ (cartella con exe e librerie)
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DVersione=0.1.0 build\installer.iss    # dist\ConvertitoreANIA-Setup-0.1.0.exe
 ```
 
@@ -86,5 +86,7 @@ Le versioni precedenti alla 0.2.0 non hanno il pulsante: vanno aggiornate una vo
 
 - L'`.exe` non è firmato: Windows (SmartScreen) può mostrare "app non riconosciuta" al primo avvio, e alcuni antivirus
   segnalano a torto gli eseguibili creati con PyInstaller. Un certificato di firma del codice (a pagamento) risolve il
-  primo problema; in caso di falsi positivi si può passare alla modalità `--onedir` o segnalare il file all'antivirus.
+  primo problema; in caso di falsi positivi si può segnalare il file all'antivirus.
+- Dalla 0.2.2 il programma è costruito come **cartella** (`--onedir`) e non come exe a file unico: l'exe a file unico si
+  estraeva in `%TEMP%` a ogni avvio (2 secondi persi e, a volte, l'errore «Failed to load Python DLL»).
 - L'installer scaricato dal programma non porta il "marchio di provenienza dal web", quindi SmartScreen non lo blocca durante l'aggiornamento; resta l'avviso della prima installazione manuale.

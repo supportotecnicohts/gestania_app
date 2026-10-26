@@ -1,4 +1,4 @@
-; Installer di Convertitore ANIA (Inno Setup 6). Si compila DOPO build\costruisci.ps1:
+; Installer di Convertitore ANIA (Inno Setup 6). Si compila DOPO build\costruisci.ps1 (cartella dist\ConvertitoreANIA\):
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DVersione=0.1.0 build\installer.iss
 ; Risultato: dist\ConvertitoreANIA-Setup-0.1.0.exe  (da allegare alla release di GitHub)
 ; Installa per l'utente corrente (nessun permesso di amministratore). Rilanciare l'installer di una versione
@@ -33,7 +33,7 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 Name: "desktopicon"; Description: "Crea un'icona sul desktop"; GroupDescription: "Icone:"
 
 [Files]
-Source: "..\dist\ConvertitoreANIA.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\ConvertitoreANIA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\Convertitore ANIA"; Filename: "{app}\ConvertitoreANIA.exe"
